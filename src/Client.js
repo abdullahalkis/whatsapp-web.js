@@ -810,6 +810,7 @@ class Client extends EventEmitter {
      * @returns {Promise<Message>} Message that was just sent
      */
     async sendMessage(chatId, content, options = {}) {
+        try {
         if (options.mentions && options.mentions.some(possiblyContact => possiblyContact instanceof Contact)) {
             console.warn('Mentions with an array of Contact are now deprecated. See more at https://github.com/pedroslopez/whatsapp-web.js/pull/2166.');
             options.mentions = options.mentions.map(a => a.id._serialized);
@@ -880,6 +881,9 @@ class Client extends EventEmitter {
         }, chatId, content, internalOptions, sendSeen);
 
         return new Message(this, newMessage);
+    } catch (error) {
+        throw new Error(error);
+    }
     }
     
     /**
