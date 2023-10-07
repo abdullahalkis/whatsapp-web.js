@@ -945,7 +945,20 @@ declare namespace WAWebJS {
         /** Sticker categories, if sendMediaAsSticker is true */
         stickerCategories?: string[]
     }
-
+    /** Options for forwarding a message */
+    export interface MessageForwardOptions {
+        /**
+         * @default false
+         */
+        multicast?: boolean
+        /** 
+         * Adds caption text to forwarded message (if provided).
+         * Value is true by default.
+         * @default true
+         */
+        withCaption?: boolean
+    }
+    
     /** Options for editing a message */
     export interface MessageEditOptions {
         /** Show links preview. Has no effect on multi-device accounts. */

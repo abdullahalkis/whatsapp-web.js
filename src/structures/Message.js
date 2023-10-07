@@ -388,22 +388,35 @@ class Message extends Base {
     async acceptGroupV4Invite() {
         return await this.client.acceptGroupV4Invite(this.inviteV4);
     }
-
+    /**
+     * Forward options:
+     * 
+     * @typedef {Object} MessageForwardOptions
+     * @property {boolean} [multicast=false]
+     * @property {boolean} [withCaption=true] Forwards this message with the caption text of the original message if provided.
+     */
+    
     /**
      * Forwards this message to another chat (that you chatted before, otherwise it will fail)
      *
      * @param {string|Chat} chat Chat model or chat ID to which the message will be forwarded
      * @returns {Promise}
      */
-    async forward(chat) {
+    async forward(chat, options = {}) {
         const chatId = typeof chat === 'string' ? chat : chat.id._serialized;
 
-        await this.client.pupPage.evaluate(async (msgId, chatId) => {
-            let msg = window.Store.Msg.get(msgId);
-            let chat = window.Store.Chat.get(chatId);
+        const forwardOptions = {
+            multicast: options.multicast || false,
+            withCaption: options.withCaption === false ? false : true
+        };
 
-            return await chat.forwardMessages([msg]);
-        }, this.id._serialized, chatId);
+        await this.client.pupPage.evaluate(async (chatId, msgId, options) => {
+            const chatWid = window.Store.WidFactory.createWid(chatId);
+            const chat = await window.Store.Chat.find(chatWid);
+            const message = window.Store.Msg.get(msgId);
+            
+            return await window.WWebJS.forwardMessage(chat, message, options);
+        }, chatId, this.id._serialized, forwardOptions);
     }
 
     /**

@@ -22,6 +22,9 @@ exports.ExposeStore = (moduleRaidStr) => {
     window.Store.NumberInfo = window.mR.findModule('formattedPhoneNumber')[0];
     window.Store.MediaTypes = window.mR.findModule('msgToMediaType')[0];
     window.Store.MediaUpload = window.mR.findModule('uploadMedia')[0];
+    window.Store.getAsMms = window.mR.findModule('getAsMms')[0].getAsMms;
+    window.Store.getIsSentByMe = window.mR.findModule('getIsSentByMe')[0].getIsSentByMe;
+    window.Store.getForwardedMessageFields = window.mR.findModule('getForwardedMessageFields')[0].getForwardedMessageFields;
     window.Store.MsgKey = window.mR.findModule((module) => module.default && module.default.fromString)[0].default;
     window.Store.MessageInfo = window.mR.findModule('sendQueryMsgInfo')[0];
     window.Store.OpaqueData = window.mR.findModule(module => module.default && module.default.createFromData)[0].default;
@@ -338,6 +341,148 @@ exports.LoadUtils = () => {
         return await window.Store.Msg.get(newMsgId._serialized);
     };
 	
+
+    window.WWebJS.forwardMessage = async (chat, msg, options = {}) => {
+        const contact = chat.contact;
+
+        if (contact.isUser && contact.isContactBlocked) {
+            throw new Error('Attempted forwarding to a blocked contact');
+        }
+
+        const isMediaMsg = Boolean(window.Store.getAsMms(msg) && !msg.ctwaContext);
+
+        if (isMediaMsg) {
+            return await window.WWebJS.forwardMediaMessage(chat, msg, options);
+        }
+
+        const forwardedMsgFields = window.Store.getForwardedMessageFields(msg);
+        const ephemeralFields = window.Store.EphemeralFields.getEphemeralFields(chat);
+        const meUser = window.Store.User.getMaybeMeUser();
+        const newId = await window.Store.MsgKey.newId();
+        const isMD = window.Store.MDBackend;
+
+        const newMsgId = new window.Store.MsgKey({
+            from: meUser,
+            to: chat.id,
+            id: newId,
+            participant: isMD && chat.id.isGroup() ? meUser : undefined,
+            selfDir: 'out',
+        });
+
+        if (msg.ctwaContext) {
+            forwardedMsgFields.body = msg.ctwaContext.sourceUrl;
+            forwardedMsgFields.type = 'chat';
+            forwardedMsgFields.mediaObject = undefined;
+        }
+
+        const newMessage = {
+            ...forwardedMsgFields,
+            ...ephemeralFields,
+            id: newMsgId,
+            from: meUser,
+            t: parseInt(new Date().getTime() / 1000),
+            to: chat.id,
+            ack: 0,
+            participant: undefined,
+            local: true,
+            self: 'out',
+            isNewMsg: true,
+            star: false,
+            isForwarded: msg.isForwarded || !window.Store.getIsSentByMe(msg),
+            forwardedFromWeb: true,
+            forwardingScore: msg.getForwardingScoreWhenForwarded(),
+            multicast: options.multicast
+        };
+
+        await window.Store.SendMessage.addAndSendMsgToChat(chat, newMessage);
+    };
+
+    window.WWebJS.forwardMediaMessage = async (chat, msg, options = {}) => {
+        const { multicast: multicast, withCaption: withCaption } = options;
+        const mediaObject = msg.mediaObject;
+
+        if (!mediaObject) {
+            throw new Error('Forwarding media message without media object');
+        }
+
+        const mediaData = msg.mediaData.toJSON();
+
+        if (mediaData.preview != null) {
+            (mediaData.preview = mediaObject.contentInfo._preview);
+        }
+
+        if (mediaData.mediaBlob instanceof window.Store.OpaqueData) {
+            mediaData.mediaBlob.retain();
+        }
+
+        const mimetype = {
+            mimetype: mediaData.mimetype
+        };
+
+        const mediaType = mediaData.isGif
+            ? {
+                ...mimetype,
+                isGif: true
+            }
+            : mimetype;
+
+        if (mediaData.type === 'ptt') {
+            mediaData.type = 'audio';
+        }
+
+        const productMsgOptions = {
+            businessOwnerJid: msg.businessOwnerJid,
+            productId: msg.productId,
+            currencyCode: msg.currencyCode,
+            priceAmount1000: msg.priceAmount1000,
+            salePriceAmount1000: msg.salePriceAmount1000,
+            retailerId: msg.retailerId,
+            url: msg.url,
+            productImageCount: msg.productImageCount,
+            title: msg.title,
+            description: msg.description
+        };
+
+        const isImageOrVideo =
+            mediaData.type === 'image' ||
+            mediaData.type === 'video';
+
+        const isBtnOrList =
+            mediaData.type === 'document' &&
+            (msg.isFromTemplate || msg.isDynamicReplyButtonsMsg);
+
+        const isProduct = mediaData.type === 'product';
+
+        const caption =
+            (withCaption && (isImageOrVideo || msg.isCaptionByUser)) ||
+            isBtnOrList ||
+            isProduct
+                ? msg.caption
+                : undefined;
+
+        const mediaPrep = new window.Store.MediaPrep.MediaPrep(
+            mediaData.type,
+            Promise.resolve(mediaData)
+        );
+
+        const mediaMessageOptions = {
+            forwardedFromWeb: true,
+            caption: caption,
+            mentionedJidList: msg.mentionedJidList,
+            groupMentions: msg.groupMentions,
+            footer: msg.type === 'product' ? msg.footer : undefined,
+            addEvenWhilePreparing: true,
+            placeholderProps: mediaType,
+            isForwarded: msg.isForwarded || !window.Store.getIsSentByMe(msg),
+            forwardingScore: msg.getForwardingScoreWhenForwarded(),
+            multicast: multicast,
+            productMsgOptions: productMsgOptions,
+            isAvatar: msg.isAvatar !== null && msg.isAvatar !== undefined && msg.isAvatar
+        };
+
+        await mediaPrep.sendToChat(chat, mediaMessageOptions);
+    };
+
     window.WWebJS.editMessage = async (msg, content, options = {}) => {
 
         const extraOptions = options.extraOptions || {};
