@@ -51,7 +51,7 @@ class Message extends Base {
          * Message content
          * @type {string}
          */
-        this.body = this.hasMedia ? data.caption || '' : data.body || '';
+        this.body = this.hasMedia ? data.caption || '' : data.body || data.pollName || '';
 
         /**
          * Message type
@@ -271,6 +271,20 @@ class Message extends Base {
             this.selectedRowId = data.listResponse.singleSelectReply.selectedRowId;
         }
 
+        if (this.type === MessageTypes.POLL_CREATION) {
+            this.pollName = data.pollName;
+            this.pollOptions = data.pollOptions;
+            this.allowMultipleAnswers = Boolean(!data.pollSelectableOptionsCount);
+            this.pollInvalidated = data.pollInvalidated;
+            this.isSentCagPollCreation = data.isSentCagPollCreation;
+
+            delete this._data.pollName;
+            delete this._data.pollOptions;
+            delete this._data.pollSelectableOptionsCount;
+            delete this._data.pollInvalidated;
+            delete this._data.isSentCagPollCreation;
+        }
+
         return super._patch(data);
     }
 
@@ -364,7 +378,7 @@ class Message extends Base {
             quotedMessageId: this.id._serialized
         };
 
-        return await this.client.sendMessage(chatId, content, options);
+        return this.client.sendMessage(chatId, content, options);
     }
 
     /**
@@ -388,14 +402,7 @@ class Message extends Base {
     async acceptGroupV4Invite() {
         return await this.client.acceptGroupV4Invite(this.inviteV4);
     }
-    /**
-     * Forward options:
-     * 
-     * @typedef {Object} MessageForwardOptions
-     * @property {boolean} [multicast=false]
-     * @property {boolean} [withCaption=true] Forwards this message with the caption text of the original message if provided.
-     */
-    
+
     /**
      * Forwards this message to another chat (that you chatted before, otherwise it will fail)
      *
