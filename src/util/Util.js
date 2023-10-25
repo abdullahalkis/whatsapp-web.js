@@ -100,20 +100,20 @@ class Util {
                     'libwebp',
                     '-vf',
                     // eslint-disable-next-line no-useless-escape
-                    'scale=\'iw*min(300/iw\,300/ih)\':\'ih*min(300/iw\,300/ih)\',format=rgba,pad=300:300:\'(300-iw)/2\':\'(300-ih)/2\':\'#00000000\',setsar=1,fps=10',
+                    'scale=\'iw*min(300/iw\,300/ih)\':\'ih*min(300/iw\,300/ih)\',format=rgba,pad=300:300:\'(300-iw)/2\':\'(300-ih)/2\':\'#00000000\',setsar=1,fps=15',
                     '-loop',
                     '0',
                     '-ss',
                     '00:00:00.0',
                     '-t',
-                    '00:00:05.0',
+                    '00:00:10.0',
                     '-preset',
                     'default',
                     '-an',
                     '-vsync',
                     '0',
                     '-s',
-                    '512:512',
+                    '256:256',
                 ])
                 .toFormat('webp')
                 .save(tempFile);
