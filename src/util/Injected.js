@@ -396,7 +396,7 @@ exports.LoadUtils = () => {
             from: meUser,
             to: chat.id,
             id: newId,
-            participant: isMD && chat.id.isGroup() ? meUser : undefined,
+            participant: isMD && chat?.id?.isGroup() ? meUser : undefined,
             selfDir: 'out',
         });
 
